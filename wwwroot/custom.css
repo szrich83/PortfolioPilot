@@ -52,3 +52,83 @@ body {
 .metric-value {
   font-family: monospace;
 }
+
+h1,
+h2,
+h3,
+h4 {
+  margin-top: 0;
+}
+
+ul,
+ol {
+  padding-left: 20px;
+}
+
+p {
+  line-height: 1.5;
+}
+
+.weights-panel {
+  padding: 24px;
+}
+
+.panel-description {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #4b5563;
+  max-width: 780px;
+}
+
+.weights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+}
+
+.weight-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.weight-label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.weight-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 1rem;
+  background: white;
+  color: #111827;
+}
+
+.weight-input:focus {
+  outline: none;
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.2);
+}
+
+.portfolio-card ul {
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
+
+.portfolio-card li {
+  margin-bottom: 6px;
+}
+
+.summary-box p:last-child,
+.portfolio-card p:last-child {
+  margin-bottom: 0;
+}

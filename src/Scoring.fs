@@ -8,8 +8,12 @@ module Scoring =
 
     let normalizeWeights (criteria: Criterion list) =
         let total = criteria |> List.sumBy (fun c -> c.Weight)
-        criteria
-        |> List.map (fun c -> { c with Weight = c.Weight / total })
+
+        if total = 0.0 then
+            criteria
+        else
+            criteria
+            |> List.map (fun c -> { c with Weight = c.Weight / total })
 
     let private getMetricValue (metric: PortfolioMetric) (criterionId: string) =
         match criterionId with
@@ -20,35 +24,50 @@ module Scoring =
         | "diversification" -> metric.Diversification
         | _ -> 0.0
 
-    let scorePortfolios (portfolios: (Portfolio * PortfolioMetric) list) (criteria: Criterion list) =
-        
-        let normalizedCriteria = normalizeWeights criteria
+    let private getMinMax (criterionId: string) (items: (Portfolio * PortfolioMetric) list) =
+        let values =
+            items
+            |> List.map (fun (_, metric) -> getMetricValue metric criterionId)
 
-        let getMinMax criterionId =
-            let values =
-                portfolios
-                |> List.map (fun (_, m) -> getMetricValue m criterionId)
-            (List.min values, List.max values)
+        (List.min values, List.max values)
+
+    let scorePortfolios (portfolios: (Portfolio * PortfolioMetric) list) (criteria: Criterion list) : PortfolioScore list =
+        let normalizedCriteria = normalizeWeights criteria
 
         portfolios
         |> List.map (fun (portfolio, metrics) ->
-
-            let scores =
+            let criterionScores =
                 normalizedCriteria
-                |> List.map (fun c ->
-                    let value = getMetricValue metrics c.Id
-                    let (minVal, maxVal) = getMinMax c.Id
+                |> List.map (fun criterion ->
+                    let rawValue = getMetricValue metrics criterion.Id
+                    let (minVal, maxVal) = getMinMax criterion.Id portfolios
 
-                    let normalized =
-                        match c.Kind with
-                        | Benefit -> normalizeBenefit minVal maxVal value
-                        | Cost -> normalizeCost minVal maxVal value
+                    let normalizedValue =
+                        match criterion.Kind with
+                        | Benefit -> normalizeBenefit minVal maxVal rawValue
+                        | Cost -> normalizeCost minVal maxVal rawValue
 
-                    (c.Id, normalized * c.Weight)
+                    let weightedScore = normalizedValue * criterion.Weight
+
+                    {
+                        CriterionId = criterion.Id
+                        CriterionName = criterion.Name
+                        RawValue = rawValue
+                        NormalizedValue = normalizedValue
+                        WeightedScore = weightedScore
+                    }
                 )
 
-            let totalScore = scores |> List.sumBy snd
+            let totalScore =
+                criterionScores
+                |> List.sumBy (fun s -> s.WeightedScore)
 
-            (portfolio.Name, totalScore, scores)
+            {
+                PortfolioId = portfolio.Id
+                PortfolioName = portfolio.Name
+                TotalScore = totalScore
+                CriteriaScores = criterionScores
+                Metrics = metrics
+            }
         )
-        |> List.sortByDescending (fun (_, total, _) -> total)
+        |> List.sortByDescending (fun p -> p.TotalScore)

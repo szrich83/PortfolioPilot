@@ -64,3 +64,23 @@ type PortfolioMetric =
         Liquidity: float
         Diversification: float
     }
+
+[<JavaScript>]
+type CriterionScore =
+    {
+        CriterionId: string
+        CriterionName: string
+        RawValue: float
+        NormalizedValue: float
+        WeightedScore: float
+    }
+
+[<JavaScript>]
+type PortfolioScore =
+    {
+        PortfolioId: string
+        PortfolioName: string
+        TotalScore: float
+        CriteriaScores: CriterionScore list
+        Metrics: PortfolioMetric
+    }

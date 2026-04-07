@@ -10,6 +10,7 @@
     <Compile Include="src/PortfolioMetrics.fs" />
     <Compile Include="src/Normalization.fs" />
     <Compile Include="src/Scoring.fs" />
+    <Compile Include="src/Explanation.fs" />
     <Compile Include="src/Client.fs" />
     <Compile Include="src/Startup.fs" />
 
