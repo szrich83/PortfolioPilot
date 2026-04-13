@@ -28,6 +28,8 @@ Users can:
 - Weighted portfolio scoring
 - Real-time ranking update
 - Explanation engine for decision transparency
+- Time-based portfolio growth chart
+- Interactive long-term simulation (capital, contribution, time horizon)
 
 ## Current Decision Criteria
 
