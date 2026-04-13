@@ -140,6 +140,68 @@ module Client =
             ]
         ]
 
+    let private growthChart (results: (string * float * float * SimulationPoint list) list) =
+        let maxMonth =
+            results
+            |> List.collect (fun (_, _, _, pts) -> pts)
+            |> List.map (fun p -> float p.Month)
+            |> List.fold max 0.0
+
+        let maxValue =
+            results
+            |> List.collect (fun (_, _, _, pts) -> pts)
+            |> List.map (fun p -> p.Value)
+            |> List.fold max 0.0
+
+        let chartColor index =
+            match index % 5 with
+            | 0 -> "#2563eb"
+            | 1 -> "#16a34a"
+            | 2 -> "#dc2626"
+            | 3 -> "#7c3aed"
+            | _ -> "#ea580c"
+
+        let buildLine (points: SimulationPoint list) color =
+            div [ attr.``class`` "chart-line" ] [
+                for p in points do
+                    let left =
+                        if maxMonth <= 0.0 then 0.0
+                        else (float p.Month / maxMonth) * 100.0
+
+                    let bottom =
+                        if maxValue <= 0.0 then 0.0
+                        else (p.Value / maxValue) * 100.0
+
+                    div [
+                        attr.``class`` "chart-point"
+                        attr.style (
+                            sprintf
+                                "left: %.2f%%; bottom: %.2f%%; background:%s;"
+                                left bottom color
+                        )
+                    ] []
+            ]
+
+        div [ attr.``class`` "chart-card" ] [
+            div [ attr.``class`` "chart-container" ] [
+                for i, (_, _, _, points) in results |> List.indexed do
+                    buildLine points (chartColor i)
+            ]
+
+            div [ attr.``class`` "chart-legend" ] [
+                for i, (name, _, finalValue, _) in results |> List.indexed do
+                    div [ attr.``class`` "chart-legend-item" ] [
+                        span [
+                            attr.``class`` "chart-legend-color"
+                            attr.style (sprintf "background:%s;" (chartColor i))
+                        ] []
+                        span [] [
+                            text (sprintf "%s (%.0f)" name finalValue)
+                        ]
+                    ]
+            ]
+        ]
+
     let private weightInput (labelText: string) (state: Var<string>) =
         div [ attr.``class`` "weight-field" ] [
             label [ attr.``class`` "weight-label" ] [ text labelText ]
@@ -286,9 +348,32 @@ module Client =
                     ]
 
                     div [ attr.``class`` "preset-buttons" ] [
-                        presetButton "Risk-Averse" returnWeightText riskWeightText feeWeightText liquidityWeightText diversificationWeightText "20" "40" "20" "10" "10"
-                        presetButton "Balanced" returnWeightText riskWeightText feeWeightText liquidityWeightText diversificationWeightText "30" "25" "15" "10" "20"
-                        presetButton "Growth-Focused" returnWeightText riskWeightText feeWeightText liquidityWeightText diversificationWeightText "45" "20" "10" "5" "20"
+                        presetButton
+                            "Risk-Averse"
+                            returnWeightText
+                            riskWeightText
+                            feeWeightText
+                            liquidityWeightText
+                            diversificationWeightText
+                            "20" "40" "20" "10" "10"
+
+                        presetButton
+                            "Balanced"
+                            returnWeightText
+                            riskWeightText
+                            feeWeightText
+                            liquidityWeightText
+                            diversificationWeightText
+                            "30" "25" "15" "10" "20"
+
+                        presetButton
+                            "Growth-Focused"
+                            returnWeightText
+                            riskWeightText
+                            feeWeightText
+                            liquidityWeightText
+                            diversificationWeightText
+                            "45" "20" "10" "5" "20"
                     ]
 
                     div [ attr.``class`` "weights-grid" ] [
@@ -306,8 +391,10 @@ module Client =
                     Doc.BindView
                         (fun ranking ->
                             match ranking with
-                            | _ :: _ -> p [] [ text (buildWinnerExplanation ranking) ]
-                            | [] -> p [] [ text "No portfolio data is available." ]
+                            | _ :: _ ->
+                                p [] [ text (buildWinnerExplanation ranking) ]
+                            | [] ->
+                                p [] [ text "No portfolio data is available." ]
                         )
                         rankingView
                 ]
@@ -355,6 +442,16 @@ module Client =
                         simulationInput "Monthly Contribution" monthlyContributionText
                         simulationInput "Years" yearsText
                     ]
+                ]
+
+                h2 [] [ text "Growth chart" ]
+
+                div [ attr.``class`` "summary-box" ] [
+                    Doc.BindView
+                        (fun results ->
+                            growthChart results
+                        )
+                        simulationView
                 ]
 
                 h2 [] [ text "Final value comparison" ]
