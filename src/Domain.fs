@@ -84,3 +84,18 @@ type PortfolioScore =
         CriteriaScores: CriterionScore list
         Metrics: PortfolioMetric
     }
+
+[<JavaScript>]
+type SimulationInput =
+    {
+        InitialCapital: float
+        MonthlyContribution: float
+        Years: int
+    }
+
+[<JavaScript>]
+type SimulationPoint =
+    {
+        Month: int
+        Value: float
+    }

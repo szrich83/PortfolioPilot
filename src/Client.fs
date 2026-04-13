@@ -8,6 +8,7 @@ open PortfolioPilot.Samples
 open PortfolioPilot.PortfolioMetrics
 open PortfolioPilot.Scoring
 open PortfolioPilot.Explanation
+open PortfolioPilot.Simulation
 
 [<JavaScript>]
 module Client =
@@ -16,6 +17,16 @@ module Client =
         match System.Double.TryParse(textValue) with
         | true, value when value >= 0.0 -> value
         | _ -> 0.0
+
+    let private parseNonNegativeFloat (textValue: string) =
+        match System.Double.TryParse(textValue) with
+        | true, value when value >= 0.0 -> value
+        | _ -> 0.0
+
+    let private parseNonNegativeInt (textValue: string) =
+        match System.Int32.TryParse(textValue) with
+        | true, value when value >= 0 -> value
+        | _ -> 0
 
     let private metricRow (title: string) (value: float) (suffix: string) =
         p [ attr.``class`` "metric-row" ] [
@@ -36,8 +47,7 @@ module Client =
     let private criterionScoreRow (score: CriterionScore) =
         li [] [
             text (
-                sprintf
-                    "%s - Raw: %.2f, Normalized: %.3f, Weighted: %.3f"
+                sprintf "%s - Raw: %.2f, Normalized: %.3f, Weighted: %.3f"
                     score.CriterionName
                     score.RawValue
                     score.NormalizedValue
@@ -53,16 +63,12 @@ module Client =
         div [ attr.``class`` "portfolio-card" ] [
             h3 [] [ text portfolio.Name ]
 
-            p [] [
-                text (sprintf "Total allocation: %.0f%%" totalAllocation)
-            ]
+            p [] [ text (sprintf "Total allocation: %.0f%%" totalAllocation) ]
 
             p [] [
                 text (
-                    if allocationOk then
-                        "Allocation status: valid"
-                    else
-                        "Allocation status: invalid"
+                    if allocationOk then "Allocation status: valid"
+                    else "Allocation status: invalid"
                 )
             ]
 
@@ -86,13 +92,8 @@ module Client =
 
     let private rankingCard (position: int) (portfolioScore: PortfolioScore) =
         div [ attr.``class`` "portfolio-card" ] [
-            h3 [] [
-                text (sprintf "%d. %s" position portfolioScore.PortfolioName)
-            ]
-
-            p [] [
-                text (sprintf "Total score: %.3f" portfolioScore.TotalScore)
-            ]
+            h3 [] [ text (sprintf "%d. %s" position portfolioScore.PortfolioName) ]
+            p [] [ text (sprintf "Total score: %.3f" portfolioScore.TotalScore) ]
 
             h4 [] [ text "Score breakdown" ]
 
@@ -102,9 +103,40 @@ module Client =
             ]
 
             h4 [] [ text "Explanation" ]
+            p [] [ text (buildPortfolioExplanation portfolioScore) ]
+        ]
 
-            p [] [
-                text (buildPortfolioExplanation portfolioScore)
+    let private scoreBarRow (portfolioScore: PortfolioScore) =
+        let widthPercent = portfolioScore.TotalScore * 100.0
+
+        div [ attr.``class`` "score-bar-row" ] [
+            div [ attr.``class`` "score-bar-header" ] [
+                span [ attr.``class`` "score-bar-name" ] [ text portfolioScore.PortfolioName ]
+                span [ attr.``class`` "score-bar-value" ] [ text (sprintf "%.3f" portfolioScore.TotalScore) ]
+            ]
+            div [ attr.``class`` "score-bar-track" ] [
+                div [
+                    attr.``class`` "score-bar-fill"
+                    attr.style (sprintf "width: %.1f%%;" widthPercent)
+                ] []
+            ]
+        ]
+
+    let private growthBarRow (name: string) (finalValue: float) (maxValue: float) =
+        let widthPercent =
+            if maxValue <= 0.0 then 0.0
+            else (finalValue / maxValue) * 100.0
+
+        div [ attr.``class`` "score-bar-row" ] [
+            div [ attr.``class`` "score-bar-header" ] [
+                span [ attr.``class`` "score-bar-name" ] [ text name ]
+                span [ attr.``class`` "score-bar-value" ] [ text (sprintf "%.0f" finalValue) ]
+            ]
+            div [ attr.``class`` "score-bar-track" ] [
+                div [
+                    attr.``class`` "growth-bar-fill"
+                    attr.style (sprintf "width: %.1f%%;" widthPercent)
+                ] []
             ]
         ]
 
@@ -121,6 +153,43 @@ module Client =
             ] state
         ]
 
+    let private simulationInput (labelText: string) (state: Var<string>) =
+        div [ attr.``class`` "weight-field" ] [
+            label [ attr.``class`` "weight-label" ] [ text labelText ]
+            Doc.InputType.Text [
+                attr.``class`` "weight-input"
+                attr.``type`` "number"
+                attr.min "0"
+                attr.step "1"
+            ] state
+        ]
+
+    let private presetButton
+        (buttonText: string)
+        (returnWeightText: Var<string>)
+        (riskWeightText: Var<string>)
+        (feeWeightText: Var<string>)
+        (liquidityWeightText: Var<string>)
+        (diversificationWeightText: Var<string>)
+        (returnValue: string)
+        (riskValue: string)
+        (feeValue: string)
+        (liquidityValue: string)
+        (diversificationValue: string) =
+
+        button [
+            attr.``class`` "preset-button"
+            on.click (fun _ _ ->
+                returnWeightText.Set returnValue
+                riskWeightText.Set riskValue
+                feeWeightText.Set feeValue
+                liquidityWeightText.Set liquidityValue
+                diversificationWeightText.Set diversificationValue
+            )
+        ] [
+            text buttonText
+        ]
+
     [<SPAEntryPoint>]
     let Main () =
         let returnWeightText = Var.Create "35"
@@ -128,6 +197,10 @@ module Client =
         let feeWeightText = Var.Create "15"
         let liquidityWeightText = Var.Create "10"
         let diversificationWeightText = Var.Create "15"
+
+        let initialCapitalText = Var.Create "10000"
+        let monthlyContributionText = Var.Create "500"
+        let yearsText = Var.Create "10"
 
         let portfolioMetrics =
             samplePortfolios
@@ -163,6 +236,34 @@ module Client =
                 scorePortfolios portfolioMetrics criteria
             )
 
+        let simulationInputsView =
+            View.Map2
+                (fun capitalPair years ->
+                    let (capital, monthly) = capitalPair
+                    (capital, monthly, years)
+                )
+                (View.Map2
+                    (fun capital monthly ->
+                        parseNonNegativeFloat capital,
+                        parseNonNegativeFloat monthly)
+                    initialCapitalText.View
+                    monthlyContributionText.View)
+                (yearsText.View |> View.Map parseNonNegativeInt)
+
+        let simulationView =
+            simulationInputsView
+            |> View.Map (fun (initialCapital, monthlyContribution, years) ->
+                portfolioMetrics
+                |> List.map (fun (portfolio, metrics) ->
+                    let points =
+                        simulatePortfolioGrowth initialCapital monthlyContribution years metrics.ExpectedReturn
+
+                    let finalValue = getFinalValue points
+                    (portfolio.Name, metrics.ExpectedReturn, finalValue, points)
+                )
+                |> List.sortByDescending (fun (_, _, finalValue, _) -> finalValue)
+            )
+
         let content =
             div [ attr.``class`` "page" ] [
                 h1 [] [ text "PortfolioPilot" ]
@@ -184,6 +285,12 @@ module Client =
                         text "Adjust the importance of each decision criterion. Higher values increase the influence of that factor in the final portfolio ranking."
                     ]
 
+                    div [ attr.``class`` "preset-buttons" ] [
+                        presetButton "Risk-Averse" returnWeightText riskWeightText feeWeightText liquidityWeightText diversificationWeightText "20" "40" "20" "10" "10"
+                        presetButton "Balanced" returnWeightText riskWeightText feeWeightText liquidityWeightText diversificationWeightText "30" "25" "15" "10" "20"
+                        presetButton "Growth-Focused" returnWeightText riskWeightText feeWeightText liquidityWeightText diversificationWeightText "45" "20" "10" "5" "20"
+                    ]
+
                     div [ attr.``class`` "weights-grid" ] [
                         weightInput "Return" returnWeightText
                         weightInput "Risk" riskWeightText
@@ -199,10 +306,8 @@ module Client =
                     Doc.BindView
                         (fun ranking ->
                             match ranking with
-                            | _ :: _ ->
-                                p [] [ text (buildWinnerExplanation ranking) ]
-                            | [] ->
-                                p [] [ text "No portfolio data is available." ]
+                            | _ :: _ -> p [] [ text (buildWinnerExplanation ranking) ]
+                            | [] -> p [] [ text "No portfolio data is available." ]
                         )
                         rankingView
                 ]
@@ -212,6 +317,19 @@ module Client =
                 div [ attr.``class`` "portfolio-grid" ] [
                     for portfolio in samplePortfolios do
                         portfolioCard portfolio
+                ]
+
+                h2 [] [ text "Score comparison" ]
+
+                div [ attr.``class`` "summary-box" ] [
+                    Doc.BindView
+                        (fun ranking ->
+                            div [] [
+                                for portfolioScore in ranking do
+                                    scoreBarRow portfolioScore
+                            ]
+                        )
+                        rankingView
                 ]
 
                 h2 [] [ text "Portfolio ranking" ]
@@ -224,6 +342,53 @@ module Client =
                         ]
                     )
                     rankingView
+
+                h2 [] [ text "Growth simulation" ]
+
+                div [ attr.``class`` "summary-box weights-panel" ] [
+                    p [ attr.``class`` "panel-description" ] [
+                        text "Simulate long-term portfolio growth using the expected annual return of each portfolio."
+                    ]
+
+                    div [ attr.``class`` "weights-grid" ] [
+                        simulationInput "Initial Capital" initialCapitalText
+                        simulationInput "Monthly Contribution" monthlyContributionText
+                        simulationInput "Years" yearsText
+                    ]
+                ]
+
+                h2 [] [ text "Final value comparison" ]
+
+                div [ attr.``class`` "summary-box" ] [
+                    Doc.BindView
+                        (fun results ->
+                            let maxValue =
+                                results
+                                |> List.map (fun (_, _, finalValue, _) -> finalValue)
+                                |> List.fold max 0.0
+
+                            div [] [
+                                for (name, _, finalValue, _) in results do
+                                    growthBarRow name finalValue maxValue
+                            ]
+                        )
+                        simulationView
+                ]
+
+                h2 [] [ text "Simulation results" ]
+
+                Doc.BindView
+                    (fun results ->
+                        div [ attr.``class`` "portfolio-grid" ] [
+                            for (name, annualReturn, finalValue, _) in results do
+                                div [ attr.``class`` "portfolio-card" ] [
+                                    h3 [] [ text name ]
+                                    p [] [ text (sprintf "Expected annual return: %.2f%%" annualReturn) ]
+                                    p [] [ text (sprintf "Final simulated value: %.0f" finalValue) ]
+                                ]
+                        ]
+                    )
+                    simulationView
             ]
 
         Doc.RunById "main" content
