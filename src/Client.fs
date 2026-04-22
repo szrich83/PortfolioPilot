@@ -28,6 +28,31 @@ module Client =
         | true, value when value >= 0 -> value
         | _ -> 0
 
+    let private parseOrZero (textValue: string) =
+        match System.Double.TryParse(textValue) with
+        | true, value -> value
+        | _ -> 0.0
+
+    let private categoryFromString (value: string) =
+        match value.Trim().ToLower() with
+        | "stock" -> Stock
+        | "bond" -> Bond
+        | "cash" -> Cash
+        | "crypto" -> Crypto
+        | _ -> ETF
+
+    let private optionValueOrEmpty (value: string) =
+        if value.Trim() = "" then None else Some value
+
+    let private buildCriteria (r: float) (rk: float) (f: float) (l: float) (d: float) : Criterion list =
+        [
+            { Id = "return"; Name = "Expected Return"; Kind = Benefit; Weight = r }
+            { Id = "risk"; Name = "Risk"; Kind = Cost; Weight = rk }
+            { Id = "fee"; Name = "Fee"; Kind = Cost; Weight = f }
+            { Id = "liquidity"; Name = "Liquidity"; Kind = Benefit; Weight = l }
+            { Id = "diversification"; Name = "Diversification"; Kind = Benefit; Weight = d }
+        ]
+
     let private metricRow (title: string) (value: float) (suffix: string) =
         p [ attr.``class`` "metric-row" ] [
             text (sprintf "%s: %.2f%s" title value suffix)
@@ -55,8 +80,8 @@ module Client =
             )
         ]
 
-    let private portfolioCard (portfolio: Portfolio) =
-        let metrics = calculatePortfolioMetrics sampleAssets portfolio
+    let private portfolioCard (assets: Asset list) (portfolio: Portfolio) =
+        let metrics = calculatePortfolioMetrics assets portfolio
         let totalAllocation = allocationTotal portfolio
         let allocationOk = isAllocationValid portfolio
 
@@ -67,8 +92,10 @@ module Client =
 
             p [] [
                 text (
-                    if allocationOk then "Allocation status: valid"
-                    else "Allocation status: invalid"
+                    if allocationOk then
+                        "Allocation status: valid"
+                    else
+                        "Allocation status: invalid"
                 )
             ]
 
@@ -76,7 +103,7 @@ module Client =
 
             ul [] [
                 for allocation in portfolio.Allocations do
-                    allocationRow sampleAssets allocation
+                    allocationRow assets allocation
             ]
 
             h4 [] [ text "Calculated metrics" ]
@@ -114,6 +141,7 @@ module Client =
                 span [ attr.``class`` "score-bar-name" ] [ text portfolioScore.PortfolioName ]
                 span [ attr.``class`` "score-bar-value" ] [ text (sprintf "%.3f" portfolioScore.TotalScore) ]
             ]
+
             div [ attr.``class`` "score-bar-track" ] [
                 div [
                     attr.``class`` "score-bar-fill"
@@ -132,6 +160,7 @@ module Client =
                 span [ attr.``class`` "score-bar-name" ] [ text name ]
                 span [ attr.``class`` "score-bar-value" ] [ text (sprintf "%.0f" finalValue) ]
             ]
+
             div [ attr.``class`` "score-bar-track" ] [
                 div [
                     attr.``class`` "growth-bar-fill"
@@ -175,8 +204,7 @@ module Client =
                     div [
                         attr.``class`` "chart-point"
                         attr.style (
-                            sprintf
-                                "left: %.2f%%; bottom: %.2f%%; background:%s;"
+                            sprintf "left: %.2f%%; bottom: %.2f%%; background:%s;"
                                 left bottom color
                         )
                     ] []
@@ -226,6 +254,48 @@ module Client =
             ] state
         ]
 
+    let private formField (labelText: string) (state: Var<string>) =
+        div [ attr.``class`` "weight-field" ] [
+            label [ attr.``class`` "weight-label" ] [ text labelText ]
+            Doc.InputType.Text [
+                attr.``class`` "weight-input"
+            ] state
+        ]
+
+    let private assetRow (removeAsset: string -> unit) (asset: Asset) =
+        tr [] [
+            td [] [ text asset.Id ]
+            td [] [ text asset.Name ]
+            td [] [ text asset.Symbol ]
+            td [] [ text (string asset.Category) ]
+            td [] [ text (sprintf "%.2f" asset.CurrentPrice) ]
+            td [] [ text (sprintf "%.2f%%" asset.ExpectedAnnualReturn) ]
+            td [] [ text (sprintf "%.2f" asset.RiskScore) ]
+            td [] [
+                button [
+                    attr.``class`` "delete-button"
+                    on.click (fun _ _ -> removeAsset asset.Id)
+                ] [
+                    text "Delete"
+                ]
+            ]
+        ]
+
+    let private portfolioRow (portfolio: Portfolio) =
+        tr [] [
+            td [] [ text portfolio.Id ]
+            td [] [ text portfolio.Name ]
+            td [] [ text (sprintf "%.0f%%" (allocationTotal portfolio)) ]
+            td [] [
+                text (
+                    if isAllocationValid portfolio then
+                        "Valid"
+                    else
+                        "Invalid"
+                )
+            ]
+        ]
+
     let private presetButton
         (buttonText: string)
         (returnWeightText: Var<string>)
@@ -264,67 +334,194 @@ module Client =
         let monthlyContributionText = Var.Create "500"
         let yearsText = Var.Create "10"
 
-        let portfolioMetrics =
-            samplePortfolios
-            |> List.map (fun p -> (p, calculatePortfolioMetrics sampleAssets p))
+        let assetsState = Var.Create sampleAssets
+        let portfoliosState = Var.Create samplePortfolios
 
-        let weightsView =
+        let assetNameText = Var.Create ""
+        let assetSymbolText = Var.Create ""
+        let assetCategoryText = Var.Create "ETF"
+        let assetPriceText = Var.Create "0"
+        let assetReturnText = Var.Create "0"
+        let assetVolatilityText = Var.Create "0"
+        let assetFeeText = Var.Create "0"
+        let assetLiquidityText = Var.Create "0"
+        let assetDiversificationText = Var.Create "0"
+        let assetRiskText = Var.Create "0"
+
+        let portfolioNameText = Var.Create ""
+        let allocationAsset1Text = Var.Create ""
+        let allocationPercent1Text = Var.Create "0"
+        let allocationAsset2Text = Var.Create ""
+        let allocationPercent2Text = Var.Create "0"
+        let allocationAsset3Text = Var.Create ""
+        let allocationPercent3Text = Var.Create "0"
+
+        let clearAssetForm () =
+            assetNameText.Set ""
+            assetSymbolText.Set ""
+            assetCategoryText.Set "ETF"
+            assetPriceText.Set "0"
+            assetReturnText.Set "0"
+            assetVolatilityText.Set "0"
+            assetFeeText.Set "0"
+            assetLiquidityText.Set "0"
+            assetDiversificationText.Set "0"
+            assetRiskText.Set "0"
+
+        let clearPortfolioForm () =
+            portfolioNameText.Set ""
+            allocationAsset1Text.Set ""
+            allocationPercent1Text.Set "0"
+            allocationAsset2Text.Set ""
+            allocationPercent2Text.Set "0"
+            allocationAsset3Text.Set ""
+            allocationPercent3Text.Set "0"
+
+        let addAsset () =
+            let newAsset : Asset =
+                {
+                    Id = System.Guid.NewGuid().ToString("N")
+                    Name = assetNameText.Value
+                    Symbol = assetSymbolText.Value
+                    Category = categoryFromString assetCategoryText.Value
+                    CurrentPrice = parseOrZero assetPriceText.Value
+                    ExpectedAnnualReturn = parseOrZero assetReturnText.Value
+                    AnnualVolatility = parseOrZero assetVolatilityText.Value
+                    AnnualFee = parseOrZero assetFeeText.Value
+                    LiquidityScore = parseOrZero assetLiquidityText.Value
+                    DiversificationScore = parseOrZero assetDiversificationText.Value
+                    RiskScore = parseOrZero assetRiskText.Value
+                }
+
+            if newAsset.Name.Trim() <> "" && newAsset.Symbol.Trim() <> "" then
+                assetsState.Set (assetsState.Value @ [ newAsset ])
+                clearAssetForm ()
+
+        let removeAsset assetId =
+            let updatedAssets =
+                assetsState.Value
+                |> List.filter (fun a -> a.Id <> assetId)
+
+            let updatedPortfolios =
+                portfoliosState.Value
+                |> List.map (fun p ->
+                    {
+                        p with
+                            Allocations =
+                                p.Allocations
+                                |> List.filter (fun a -> a.AssetId <> assetId)
+                    })
+
+            assetsState.Set updatedAssets
+            portfoliosState.Set updatedPortfolios
+
+        let addPortfolio () =
+            let allocations : PortfolioAllocation list =
+                [
+                    optionValueOrEmpty allocationAsset1Text.Value
+                    |> Option.map (fun assetId ->
+                        {
+                            AssetId = assetId
+                            Percentage = parseOrZero allocationPercent1Text.Value
+                        })
+
+                    optionValueOrEmpty allocationAsset2Text.Value
+                    |> Option.map (fun assetId ->
+                        {
+                            AssetId = assetId
+                            Percentage = parseOrZero allocationPercent2Text.Value
+                        })
+
+                    optionValueOrEmpty allocationAsset3Text.Value
+                    |> Option.map (fun assetId ->
+                        {
+                            AssetId = assetId
+                            Percentage = parseOrZero allocationPercent3Text.Value
+                        })
+                ]
+                |> List.choose id
+                |> List.filter (fun a -> a.Percentage > 0.0)
+
+            let assetIds =
+                assetsState.Value |> List.map (fun a -> a.Id) |> Set.ofList
+
+            let allAllocationsValid =
+                allocations
+                |> List.forall (fun a -> Set.contains a.AssetId assetIds)
+
+            let newPortfolio : Portfolio =
+                {
+                    Id = System.Guid.NewGuid().ToString("N")
+                    Name = portfolioNameText.Value
+                    Allocations = allocations
+                }
+
+            if newPortfolio.Name.Trim() <> "" && not newPortfolio.Allocations.IsEmpty && allAllocationsValid then
+                portfoliosState.Set (portfoliosState.Value @ [ newPortfolio ])
+                clearPortfolioForm ()
+
+        let weightsView : View<float * float * float * float * float> =
             View.Map2
-                (fun left right -> left, right)
+                (fun (r, rk) (f, (l, d)) -> (r, rk, f, l, d))
                 (View.Map2
-                    (fun r rk -> parseWeight r, parseWeight rk)
+                    (fun r rk -> (parseWeight r, parseWeight rk))
                     returnWeightText.View
                     riskWeightText.View)
                 (View.Map2
-                    (fun f rest -> parseWeight f, rest)
+                    (fun f rest -> (parseWeight f, rest))
                     feeWeightText.View
                     (View.Map2
-                        (fun l d -> parseWeight l, parseWeight d)
+                        (fun l d -> (parseWeight l, parseWeight d))
                         liquidityWeightText.View
                         diversificationWeightText.View))
 
-        let rankingView =
-            weightsView
-            |> View.Map (fun ((r, rk), (f, (l, d))) ->
-                let criteria =
-                    [
-                        { Id = "return"; Name = "Expected Return"; Kind = Benefit; Weight = r }
-                        { Id = "risk"; Name = "Risk"; Kind = Cost; Weight = rk }
-                        { Id = "fee"; Name = "Fee"; Kind = Cost; Weight = f }
-                        { Id = "liquidity"; Name = "Liquidity"; Kind = Benefit; Weight = l }
-                        { Id = "diversification"; Name = "Diversification"; Kind = Benefit; Weight = d }
-                    ]
-
-                scorePortfolios portfolioMetrics criteria
-            )
-
-        let simulationInputsView =
+        let portfolioMetricsView : View<(Portfolio * PortfolioMetric) list> =
             View.Map2
-                (fun capitalPair years ->
-                    let (capital, monthly) = capitalPair
-                    (capital, monthly, years)
+                (fun (assets: Asset list) (portfolios: Portfolio list) ->
+                    portfolios
+                    |> List.map (fun (p: Portfolio) ->
+                        let metrics = calculatePortfolioMetrics assets p
+                        (p, metrics)
+                    ))
+                assetsState.View
+                portfoliosState.View
+
+        let rankingView : View<PortfolioScore list> =
+            View.Map2
+                (fun (portfolioMetrics: (Portfolio * PortfolioMetric) list) (weights: float * float * float * float * float) ->
+                    let (r, rk, f, l, d) = weights
+                    let criteria : Criterion list = buildCriteria r rk f l d
+                    scorePortfolios portfolioMetrics criteria
                 )
+                portfolioMetricsView
+                weightsView
+
+        let simulationInputsView : View<float * float * int> =
+            View.Map2
+                (fun (capital, monthly) years ->
+                    (capital, monthly, years))
                 (View.Map2
                     (fun capital monthly ->
-                        parseNonNegativeFloat capital,
-                        parseNonNegativeFloat monthly)
+                        (parseNonNegativeFloat capital, parseNonNegativeFloat monthly))
                     initialCapitalText.View
                     monthlyContributionText.View)
                 (yearsText.View |> View.Map parseNonNegativeInt)
 
-        let simulationView =
-            simulationInputsView
-            |> View.Map (fun (initialCapital, monthlyContribution, years) ->
-                portfolioMetrics
-                |> List.map (fun (portfolio, metrics) ->
-                    let points =
-                        simulatePortfolioGrowth initialCapital monthlyContribution years metrics.ExpectedReturn
+        let simulationView : View<(string * float * float * SimulationPoint list) list> =
+            View.Map2
+                (fun (portfolioMetrics: (Portfolio * PortfolioMetric) list) (initialCapital, monthlyContribution, years) ->
+                    portfolioMetrics
+                    |> List.map (fun (portfolio, metrics) ->
+                        let points =
+                            simulatePortfolioGrowth initialCapital monthlyContribution years metrics.ExpectedReturn
 
-                    let finalValue = getFinalValue points
-                    (portfolio.Name, metrics.ExpectedReturn, finalValue, points)
+                        let finalValue = getFinalValue points
+                        (portfolio.Name, metrics.ExpectedReturn, finalValue, points)
+                    )
+                    |> List.sortByDescending (fun (_, _, finalValue, _) -> finalValue)
                 )
-                |> List.sortByDescending (fun (_, _, finalValue, _) -> finalValue)
-            )
+                portfolioMetricsView
+                simulationInputsView
 
         let content =
             div [ attr.``class`` "page" ] [
@@ -335,9 +532,19 @@ module Client =
                 ]
 
                 div [ attr.``class`` "summary-box" ] [
-                    p [] [ text (sprintf "Sample assets: %d" (List.length sampleAssets)) ]
-                    p [] [ text (sprintf "Sample portfolios: %d" (List.length samplePortfolios)) ]
-                    p [] [ text "Sample criteria: 5" ]
+                    Doc.BindView
+                        (fun assets ->
+                            Doc.BindView
+                                (fun portfolios ->
+                                    div [] [
+                                        p [] [ text (sprintf "Available assets: %d" (List.length assets)) ]
+                                        p [] [ text (sprintf "Available portfolios: %d" (List.length portfolios)) ]
+                                        p [] [ text "Decision criteria: 5" ]
+                                    ]
+                                )
+                                portfoliosState.View
+                        )
+                        assetsState.View
                 ]
 
                 h2 [] [ text "Adjust weights" ]
@@ -348,32 +555,9 @@ module Client =
                     ]
 
                     div [ attr.``class`` "preset-buttons" ] [
-                        presetButton
-                            "Risk-Averse"
-                            returnWeightText
-                            riskWeightText
-                            feeWeightText
-                            liquidityWeightText
-                            diversificationWeightText
-                            "20" "40" "20" "10" "10"
-
-                        presetButton
-                            "Balanced"
-                            returnWeightText
-                            riskWeightText
-                            feeWeightText
-                            liquidityWeightText
-                            diversificationWeightText
-                            "30" "25" "15" "10" "20"
-
-                        presetButton
-                            "Growth-Focused"
-                            returnWeightText
-                            riskWeightText
-                            feeWeightText
-                            liquidityWeightText
-                            diversificationWeightText
-                            "45" "20" "10" "5" "20"
+                        presetButton "Risk-Averse" returnWeightText riskWeightText feeWeightText liquidityWeightText diversificationWeightText "20" "40" "20" "10" "10"
+                        presetButton "Balanced" returnWeightText riskWeightText feeWeightText liquidityWeightText diversificationWeightText "30" "25" "15" "10" "20"
+                        presetButton "Growth-Focused" returnWeightText riskWeightText feeWeightText liquidityWeightText diversificationWeightText "45" "20" "10" "5" "20"
                     ]
 
                     div [ attr.``class`` "weights-grid" ] [
@@ -391,20 +575,151 @@ module Client =
                     Doc.BindView
                         (fun ranking ->
                             match ranking with
-                            | _ :: _ ->
-                                p [] [ text (buildWinnerExplanation ranking) ]
-                            | [] ->
-                                p [] [ text "No portfolio data is available." ]
+                            | _ :: _ -> p [] [ text (buildWinnerExplanation ranking) ]
+                            | [] -> p [] [ text "No portfolio data is available." ]
                         )
                         rankingView
                 ]
 
-                h2 [] [ text "Sample portfolios" ]
+                h2 [] [ text "Asset editor" ]
 
-                div [ attr.``class`` "portfolio-grid" ] [
-                    for portfolio in samplePortfolios do
-                        portfolioCard portfolio
+                div [ attr.``class`` "summary-box weights-panel" ] [
+                    p [ attr.``class`` "panel-description" ] [
+                        text "Add custom financial assets manually."
+                    ]
+
+                    div [ attr.``class`` "editor-grid" ] [
+                        formField "Name" assetNameText
+                        formField "Symbol" assetSymbolText
+                        formField "Category (ETF / Stock / Bond / Cash / Crypto)" assetCategoryText
+                        formField "Current Price" assetPriceText
+                        formField "Expected Annual Return" assetReturnText
+                        formField "Annual Volatility" assetVolatilityText
+                        formField "Annual Fee" assetFeeText
+                        formField "Liquidity Score" assetLiquidityText
+                        formField "Diversification Score" assetDiversificationText
+                        formField "Risk Score" assetRiskText
+                    ]
+
+                    div [ attr.``class`` "editor-actions" ] [
+                        button [
+                            attr.``class`` "preset-button"
+                            on.click (fun _ _ -> addAsset ())
+                        ] [
+                            text "Add asset"
+                        ]
+                    ]
                 ]
+
+                h2 [] [ text "Available assets" ]
+
+                div [ attr.``class`` "summary-box" ] [
+                    Doc.BindView
+                        (fun assets ->
+                            table [ attr.``class`` "asset-table" ] [
+                                thead [] [
+                                    tr [] [
+                                        th [] [ text "ID" ]
+                                        th [] [ text "Name" ]
+                                        th [] [ text "Symbol" ]
+                                        th [] [ text "Category" ]
+                                        th [] [ text "Price" ]
+                                        th [] [ text "Return" ]
+                                        th [] [ text "Risk" ]
+                                        th [] [ text "Action" ]
+                                    ]
+                                ]
+                                tbody [] [
+                                    for asset in assets do
+                                        assetRow removeAsset asset
+                                ]
+                            ]
+                        )
+                        assetsState.View
+                ]
+
+                h2 [] [ text "Portfolio editor" ]
+
+                div [ attr.``class`` "summary-box weights-panel" ] [
+                    p [ attr.``class`` "panel-description" ] [
+                        text "Create a new portfolio using up to three asset allocations."
+                    ]
+
+                    div [ attr.``class`` "portfolio-name-field" ] [
+                        label [ attr.``class`` "weight-label" ] [ text "Portfolio Name" ]
+                        Doc.InputType.Text [
+                            attr.``class`` "weight-input"
+                            attr.placeholder "e.g. My Balanced Portfolio"
+                        ] portfolioNameText
+                    ]
+
+                    div [ attr.``class`` "allocation-grid" ] [
+                        div [ attr.``class`` "allocation-card" ] [
+                            h4 [] [ text "Asset 1" ]
+                            formField "Asset ID" allocationAsset1Text
+                            formField "Percentage" allocationPercent1Text
+                        ]
+
+                        div [ attr.``class`` "allocation-card" ] [
+                            h4 [] [ text "Asset 2" ]
+                            formField "Asset ID" allocationAsset2Text
+                            formField "Percentage" allocationPercent2Text
+                        ]
+
+                        div [ attr.``class`` "allocation-card" ] [
+                            h4 [] [ text "Asset 3" ]
+                            formField "Asset ID" allocationAsset3Text
+                            formField "Percentage" allocationPercent3Text
+                        ]
+                    ]
+
+                    div [ attr.``class`` "editor-actions" ] [
+                        button [
+                            attr.``class`` "preset-button"
+                            on.click (fun _ _ -> addPortfolio ())
+                        ] [
+                            text "Add portfolio"
+                        ]
+                    ]
+                ]
+
+                h2 [] [ text "Available portfolios" ]
+
+                div [ attr.``class`` "summary-box" ] [
+                    Doc.BindView
+                        (fun portfolios ->
+                            table [ attr.``class`` "asset-table" ] [
+                                thead [] [
+                                    tr [] [
+                                        th [] [ text "ID" ]
+                                        th [] [ text "Name" ]
+                                        th [] [ text "Total Allocation" ]
+                                        th [] [ text "Status" ]
+                                    ]
+                                ]
+                                tbody [] [
+                                    for portfolio in portfolios do
+                                        portfolioRow portfolio
+                                ]
+                            ]
+                        )
+                        portfoliosState.View
+                ]
+
+                h2 [] [ text "Current portfolios" ]
+
+                Doc.BindView
+                    (fun assets ->
+                        Doc.BindView
+                            (fun portfolios ->
+                                div [ attr.``class`` "portfolio-grid" ] [
+                                    for portfolio in portfolios do
+                                        portfolioCard assets portfolio
+                                ]
+                            )
+                            portfoliosState.View
+                    )
+                    assetsState.View
 
                 h2 [] [ text "Score comparison" ]
 
@@ -448,9 +763,7 @@ module Client =
 
                 div [ attr.``class`` "summary-box" ] [
                     Doc.BindView
-                        (fun results ->
-                            growthChart results
-                        )
+                        (fun results -> growthChart results)
                         simulationView
                 ]
 

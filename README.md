@@ -30,6 +30,51 @@ Users can:
 - Explanation engine for decision transparency
 - Time-based portfolio growth chart
 - Interactive long-term simulation (capital, contribution, time horizon)
+- Manual asset management (create and remove financial assets)
+- Portfolio builder with custom asset allocations
+- Weighted decision support system (return, risk, fee, liquidity, diversification)
+- Strategy comparison and ranking
+- Long-term growth simulation (initial capital, monthly contribution, time horizon)
+- Visual comparison (score bars, growth chart, final value comparison)
+- Preset scenarios (risk-averse, balanced, growth-focused)
+
+## How to use
+
+1. Adjust decision weights using sliders or preset buttons.
+2. Add custom financial assets in the Asset Editor.
+3. Create portfolios by assigning asset IDs and allocation percentages.
+4. Compare portfolio rankings based on your preferences.
+5. Simulate long-term growth using configurable parameters.
+
+## Data model and assumptions
+
+The application uses manually provided asset data instead of live market feeds.
+
+Each asset includes:
+
+- Expected annual return
+- Risk score
+- Annual fee
+- Liquidity score
+- Diversification score
+
+Portfolio metrics are calculated using weighted averages of asset properties.
+
+The simulation assumes constant annual returns and monthly compounding.
+
+## Limitations
+
+- No live market data (simulation-based only)
+- Simplified risk model (no correlation or covariance)
+- Returns are deterministic (no stochastic modeling)
+
+## Future improvements
+
+- Asset selection via dropdown instead of manual ID input
+- Data import/export (CSV/JSON)
+- Persistent storage (local or database)
+- More advanced risk modeling
+- Interactive time-series charts
 
 ## Current Decision Criteria
 
