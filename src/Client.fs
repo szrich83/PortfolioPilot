@@ -44,6 +44,9 @@ module Client =
     let private optionValueOrEmpty (value: string) =
         if value.Trim() = "" then None else Some value
 
+    let private isApproximately100 (value: float) =
+        abs (value - 100.0) < 0.01
+
     let private buildCriteria (r: float) (rk: float) (f: float) (l: float) (d: float) : Criterion list =
         [
             { Id = "return"; Name = "Expected Return"; Kind = Benefit; Weight = r }
@@ -262,6 +265,33 @@ module Client =
             ] state
         ]
 
+    let private assetSelectorField (labelText: string) (state: Var<string>) (assetsView: View<Asset list>) =
+        div [ attr.``class`` "weight-field" ] [
+            label [ attr.``class`` "weight-label" ] [ text labelText ]
+
+            Doc.InputType.Text [
+                attr.``class`` "weight-input"
+                attr.placeholder "Paste asset ID or click below"
+            ] state
+
+            Doc.BindView
+                (fun (assets: Asset list) ->
+                    div [ attr.style "display:flex; flex-direction:column; gap:6px; margin-top:8px;" ] [
+                        for (asset: Asset) in assets do
+                            button [
+                                attr.``class`` "preset-button"
+                                attr.style "padding:6px 10px; font-size:0.8rem; text-align:left;"
+                                on.click (fun _ _ ->
+                                    state.Set asset.Id
+                                )
+                            ] [
+                                text (sprintf "%s (%s)" asset.Name asset.Symbol)
+                            ]
+                    ]
+                )
+                assetsView
+        ]
+
     let private assetRow (removeAsset: string -> unit) (asset: Asset) =
         tr [] [
             td [] [ text asset.Id ]
@@ -355,6 +385,18 @@ module Client =
         let allocationPercent2Text = Var.Create "0"
         let allocationAsset3Text = Var.Create ""
         let allocationPercent3Text = Var.Create "0"
+
+        let allocationTotalView : View<float> =
+            View.Map2
+                (fun left p3 ->
+                    let (p1, p2) = left
+                    parseOrZero p1 + parseOrZero p2 + parseOrZero p3
+                )
+                (View.Map2
+                    (fun p1 p2 -> (p1, p2))
+                    allocationPercent1Text.View
+                    allocationPercent2Text.View)
+                allocationPercent3Text.View
 
         let clearAssetForm () =
             assetNameText.Set ""
@@ -456,7 +498,14 @@ module Client =
                     Allocations = allocations
                 }
 
-            if newPortfolio.Name.Trim() <> "" && not newPortfolio.Allocations.IsEmpty && allAllocationsValid then
+            let totalPercentage =
+                newPortfolio.Allocations
+                |> List.sumBy (fun a -> a.Percentage)
+
+            if newPortfolio.Name.Trim() <> "" &&
+                not newPortfolio.Allocations.IsEmpty &&
+                allAllocationsValid &&
+                isApproximately100 totalPercentage then
                 portfoliosState.Set (portfoliosState.Value @ [ newPortfolio ])
                 clearPortfolioForm ()
 
@@ -656,22 +705,42 @@ module Client =
                     div [ attr.``class`` "allocation-grid" ] [
                         div [ attr.``class`` "allocation-card" ] [
                             h4 [] [ text "Asset 1" ]
-                            formField "Asset ID" allocationAsset1Text
+                            assetSelectorField "Asset" allocationAsset1Text assetsState.View
                             formField "Percentage" allocationPercent1Text
                         ]
 
                         div [ attr.``class`` "allocation-card" ] [
                             h4 [] [ text "Asset 2" ]
-                            formField "Asset ID" allocationAsset2Text
+                            assetSelectorField "Asset" allocationAsset2Text assetsState.View
                             formField "Percentage" allocationPercent2Text
                         ]
 
                         div [ attr.``class`` "allocation-card" ] [
                             h4 [] [ text "Asset 3" ]
-                            formField "Asset ID" allocationAsset3Text
+                            assetSelectorField "Asset" allocationAsset3Text assetsState.View
                             formField "Percentage" allocationPercent3Text
                         ]
                     ]
+
+                    Doc.BindView
+                        (fun total ->
+                            let isValid = isApproximately100 total
+
+                            div [
+                                attr.``class`` (
+                                    if isValid then
+                                        "allocation-status allocation-status-ok"
+                                    else
+                                        "allocation-status allocation-status-error"
+                                )
+                            ] [
+                                if isValid then
+                                    text (sprintf "Allocation total: %.0f%% — valid" total)
+                                else
+                                    text (sprintf "Allocation total: %.0f%% — must be exactly 100%%" total)
+                            ]
+                    )
+                        allocationTotalView
 
                     div [ attr.``class`` "editor-actions" ] [
                         button [
