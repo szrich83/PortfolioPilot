@@ -311,7 +311,7 @@ module Client =
             ]
         ]
 
-    let private portfolioRow (portfolio: Portfolio) =
+    let private portfolioRow (removePortfolio: string -> unit) (portfolio: Portfolio) =
         tr [] [
             td [] [ text portfolio.Id ]
             td [] [ text portfolio.Name ]
@@ -324,7 +324,16 @@ module Client =
                         "Invalid"
                 )
             ]
+            td [] [
+                button [
+                    attr.``class`` "delete-button"
+                    on.click (fun _ _ -> removePortfolio portfolio.Id)
+                ] [
+                    text "Delete"
+                ]
+            ]
         ]
+    
 
     let private presetButton
         (buttonText: string)
@@ -484,6 +493,7 @@ module Client =
                 |> List.choose id
                 |> List.filter (fun a -> a.Percentage > 0.0)
 
+            
             let assetIds =
                 assetsState.Value |> List.map (fun a -> a.Id) |> Set.ofList
 
@@ -508,6 +518,13 @@ module Client =
                 isApproximately100 totalPercentage then
                 portfoliosState.Set (portfoliosState.Value @ [ newPortfolio ])
                 clearPortfolioForm ()
+
+        let removePortfolio portfolioId =
+            portfoliosState.Set (
+                portfoliosState.Value
+                |> List.filter (fun p -> p.Id <> portfolioId)
+            )
+
 
         let weightsView : View<float * float * float * float * float> =
             View.Map2
@@ -764,11 +781,12 @@ module Client =
                                         th [] [ text "Name" ]
                                         th [] [ text "Total Allocation" ]
                                         th [] [ text "Status" ]
+                                        th [] [ text "Action" ]
                                     ]
                                 ]
                                 tbody [] [
                                     for portfolio in portfolios do
-                                        portfolioRow portfolio
+                                        portfolioRow removePortfolio portfolio
                                 ]
                             ]
                         )
