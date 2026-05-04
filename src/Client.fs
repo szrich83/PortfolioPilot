@@ -9,6 +9,7 @@ open PortfolioPilot.PortfolioMetrics
 open PortfolioPilot.Scoring
 open PortfolioPilot.Explanation
 open PortfolioPilot.Simulation
+open WebSharper.JavaScript
 
 [<JavaScript>]
 module Client =
@@ -40,6 +41,18 @@ module Client =
         | "cash" -> Cash
         | "crypto" -> Crypto
         | _ -> ETF
+
+    let private categoryToString category =
+        match category with
+        | ETF -> "ETF"
+        | Stock -> "Stock"
+        | Bond -> "Bond"
+        | Cash -> "Cash"
+        | Crypto -> "Crypto"
+
+    [<Inline("(function(filename, content) { var blob = new Blob([content], { type: 'application/json' }); var url = URL.createObjectURL(blob); var a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); })($filename, $content)")>]
+    let private downloadJsonFile (filename: string) (content: string) : unit =
+        X<unit>
 
     let private optionValueOrEmpty (value: string) =
         if value.Trim() = "" then None else Some value
@@ -292,12 +305,96 @@ module Client =
                 assetsView
         ]
 
+    let private escapeJson (value: string) =
+        value
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\n", "\\n")
+            .Replace("\r", "\\r")
+
+    let private assetToJson (asset: Asset) =
+        sprintf
+            """{
+    "id": "%s",
+    "name": "%s",
+    "symbol": "%s",
+    "category": "%s",
+    "currentPrice": %.2f,
+    "expectedAnnualReturn": %.2f,
+    "annualVolatility": %.2f,
+    "annualFee": %.2f,
+    "liquidityScore": %.2f,
+    "diversificationScore": %.2f,
+    "riskScore": %.2f
+  }"""
+            (escapeJson asset.Id)
+            (escapeJson asset.Name)
+            (escapeJson asset.Symbol)
+            (categoryToString asset.Category)
+            asset.CurrentPrice
+            asset.ExpectedAnnualReturn
+            asset.AnnualVolatility
+            asset.AnnualFee
+            asset.LiquidityScore
+            asset.DiversificationScore
+            asset.RiskScore
+
+    let private allocationToJson (allocation: PortfolioAllocation) =
+        sprintf
+            """{
+      "assetId": "%s",
+      "percentage": %.2f
+    }"""
+            (escapeJson allocation.AssetId)
+            allocation.Percentage
+
+    let private portfolioToJson (portfolio: Portfolio) =
+        let allocationsJson =
+            portfolio.Allocations
+            |> List.map allocationToJson
+            |> String.concat ",\n"
+
+        sprintf
+            """{
+    "id": "%s",
+    "name": "%s",
+    "allocations": [
+%s
+    ]
+  }"""
+            (escapeJson portfolio.Id)
+            (escapeJson portfolio.Name)
+            allocationsJson
+
+    let private exportDataToJson (assets: Asset list) (portfolios: Portfolio list) =
+        let assetsJson =
+            assets
+            |> List.map assetToJson
+            |> String.concat ",\n"
+
+        let portfoliosJson =
+            portfolios
+            |> List.map portfolioToJson
+            |> String.concat ",\n"
+
+        sprintf
+            """{
+  "assets": [
+%s
+  ],
+  "portfolios": [
+%s
+  ]
+}"""
+            assetsJson
+            portfoliosJson
+
     let private assetRow (removeAsset: string -> unit) (asset: Asset) =
         tr [] [
             td [] [ text asset.Id ]
             td [] [ text asset.Name ]
             td [] [ text asset.Symbol ]
-            td [] [ text (string asset.Category) ]
+            td [] [ text (categoryToString asset.Category) ]
             td [] [ text (sprintf "%.2f" asset.CurrentPrice) ]
             td [] [ text (sprintf "%.2f%%" asset.ExpectedAnnualReturn) ]
             td [] [ text (sprintf "%.2f" asset.RiskScore) ]
@@ -333,7 +430,6 @@ module Client =
                 ]
             ]
         ]
-    
 
     let private presetButton
         (buttonText: string)
@@ -394,6 +490,8 @@ module Client =
         let allocationPercent2Text = Var.Create "0"
         let allocationAsset3Text = Var.Create ""
         let allocationPercent3Text = Var.Create "0"
+
+        let exportedJsonText = Var.Create ""
 
         let allocationTotalView : View<float> =
             View.Map2
@@ -493,7 +591,6 @@ module Client =
                 |> List.choose id
                 |> List.filter (fun a -> a.Percentage > 0.0)
 
-            
             let assetIds =
                 assetsState.Value |> List.map (fun a -> a.Id) |> Set.ofList
 
@@ -513,9 +610,9 @@ module Client =
                 |> List.sumBy (fun a -> a.Percentage)
 
             if newPortfolio.Name.Trim() <> "" &&
-                not newPortfolio.Allocations.IsEmpty &&
-                allAllocationsValid &&
-                isApproximately100 totalPercentage then
+               not newPortfolio.Allocations.IsEmpty &&
+               allAllocationsValid &&
+               isApproximately100 totalPercentage then
                 portfoliosState.Set (portfoliosState.Value @ [ newPortfolio ])
                 clearPortfolioForm ()
 
@@ -525,6 +622,11 @@ module Client =
                 |> List.filter (fun p -> p.Id <> portfolioId)
             )
 
+        let exportCurrentData () =
+            let json =
+                exportDataToJson assetsState.Value portfoliosState.Value
+
+            exportedJsonText.Set json
 
         let weightsView : View<float * float * float * float * float> =
             View.Map2
@@ -756,7 +858,7 @@ module Client =
                                 else
                                     text (sprintf "Allocation total: %.0f%% — must be exactly 100%%" total)
                             ]
-                    )
+                        )
                         allocationTotalView
 
                     div [ attr.``class`` "editor-actions" ] [
@@ -886,6 +988,33 @@ module Client =
                         ]
                     )
                     simulationView
+
+                h2 [] [ text "Data export" ]
+
+                div [ attr.``class`` "summary-box weights-panel" ] [
+                    p [ attr.``class`` "panel-description" ] [
+                        text "Export the current assets and portfolios as JSON. This can later be used for import or backup."
+                    ]
+
+                    div [ attr.``class`` "editor-actions" ] [
+                        button [
+                            attr.``class`` "preset-button"
+                            on.click (fun _ _ ->
+                                let json = exportDataToJson assetsState.Value portfoliosState.Value
+                                exportedJsonText.Set json
+                                downloadJsonFile "portfolio-data.json" json
+                            )
+                        ] [
+                            text "Export current data as JSON"
+                        ]
+                    ]
+
+                    Doc.InputArea [
+                        attr.``class`` "json-output"
+                        attr.rows "16"
+                        attr.placeholder "Exported JSON will appear here..."
+                    ] exportedJsonText
+                ]
             ]
 
         Doc.RunById "main" content

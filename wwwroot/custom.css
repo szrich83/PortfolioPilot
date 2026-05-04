@@ -453,3 +453,17 @@ li {
   color: #991b1b;
   border: 1px solid #fecaca;
 }
+
+.json-output {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 320px;
+  border: 1px solid rgba(203, 213, 225, 0.9);
+  border-radius: 16px;
+  padding: 16px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9rem;
+  background: #0f172a;
+  color: #dbeafe;
+  resize: vertical;
+}
