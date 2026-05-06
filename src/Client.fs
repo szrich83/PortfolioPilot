@@ -54,6 +54,18 @@ module Client =
     let private downloadJsonFile (filename: string) (content: string) : unit =
         X<unit>
 
+    [<Inline("window.localStorage.setItem($key, $value)")>]
+    let private saveTextToLocalStorage (key: string) (value: string) : unit =
+        X<unit>
+
+    [<Inline("window.localStorage.getItem($key) || ''")>]
+    let private loadTextFromLocalStorage (key: string) : string =
+        X<string>
+
+    [<Inline("window.localStorage.removeItem($key)")>]
+    let private removeTextFromLocalStorage (key: string) : unit =
+        X<unit>
+
     let private optionValueOrEmpty (value: string) =
         if value.Trim() = "" then None else Some value
 
@@ -492,6 +504,7 @@ module Client =
         let allocationPercent3Text = Var.Create "0"
 
         let exportedJsonText = Var.Create ""
+        let storageStatusText = Var.Create ""
 
         let allocationTotalView : View<float> =
             View.Map2
@@ -627,6 +640,28 @@ module Client =
                 exportDataToJson assetsState.Value portfoliosState.Value
 
             exportedJsonText.Set json
+
+        let saveCurrentDataToBrowser () =
+            let json =
+                exportDataToJson assetsState.Value portfoliosState.Value
+
+            exportedJsonText.Set json
+            saveTextToLocalStorage "portfolioPilotData" json
+            storageStatusText.Set "Current data saved in this browser."
+
+        let loadSavedDataFromBrowser () =
+            let savedJson =
+                loadTextFromLocalStorage "portfolioPilotData"
+
+            if savedJson.Trim() = "" then
+                storageStatusText.Set "No saved data found in this browser."
+            else
+                exportedJsonText.Set savedJson
+                storageStatusText.Set "Saved JSON loaded into the export box."
+
+        let clearSavedDataFromBrowser () =
+            removeTextFromLocalStorage "portfolioPilotData"
+            storageStatusText.Set "Saved browser data cleared."
 
         let weightsView : View<float * float * float * float * float> =
             View.Map2
@@ -1007,7 +1042,36 @@ module Client =
                         ] [
                             text "Export current data as JSON"
                         ]
+
+                        button [
+                            attr.``class`` "preset-button"
+                            on.click (fun _ _ -> saveCurrentDataToBrowser ())
+                        ] [
+                            text "Save in browser"
+                        ]
+
+                        button [
+                            attr.``class`` "preset-button"
+                            on.click (fun _ _ -> loadSavedDataFromBrowser ())
+                        ] [
+                            text "Load saved JSON"
+                        ]
+
+                        button [
+                            attr.``class`` "delete-button"
+                            on.click (fun _ _ -> clearSavedDataFromBrowser ())
+                        ] [
+                            text "Clear saved data"
+                        ]
                     ]
+
+                    Doc.BindView
+                        (fun message ->
+                            p [ attr.``class`` "storage-status" ] [
+                                text message
+                            ]
+                        )
+                        storageStatusText.View
 
                     Doc.InputArea [
                         attr.``class`` "json-output"
