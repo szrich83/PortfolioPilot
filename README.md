@@ -7,7 +7,7 @@
 ![GitHub repo size](https://img.shields.io/github/repo-size/szrich83/PortfolioPilot)
 ![GitHub last commit](https://img.shields.io/github/last-commit/szrich83/PortfolioPilot)
 
-![PortfolioPilot Preview](docs/portfolio-pilot-dashboard.png)
+![PortfolioPilot Preview](docs/main.png)
 
 ---
 
@@ -211,13 +211,28 @@ PortfolioPilot/
 
 ![Main UI](docs/main.png)
 
+### Asset editor
+
+![Assets](docs/assets.png)
+
+### Portfolio editor
+
+![Portfolio Editor](docs/portfolio-editor1.png)
+![Portfolio Editor](docs/portfolio-editor2.png)
+![Portfolio Editor](docs/portfolio-editor3.png)
+
 ### Portfolio ranking
 
 ![Ranking](docs/ranking.png)
 
 ### Growth simulation
 
-![Simulation](docs/simulation.png)
+![Simulation](docs/simulation1.png)
+![Simulation](docs/simulation2.png)
+
+### JSON export and browser storage
+
+![Export](docs/export.png)
 
 ---
 
@@ -231,6 +246,12 @@ PortfolioPilot/
 - Backend database support
 - User authentication
 - Real-time financial APIs
+
+---
+
+## Live Demo
+
+https://portfoliopilot-yx7c.onrender.com/
 
 ---
 
