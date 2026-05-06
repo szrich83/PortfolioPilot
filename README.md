@@ -1,108 +1,243 @@
-# PortfolioPilot
+# PortfolioPilot – Portfolio Decision Support & Investment Simulation
 
-PortfolioPilot is a web-based portfolio decision support and simulation tool built in F# with WebSharper.
+![.NET](https://img.shields.io/badge/.NET-10.0-blue)
+![F#](https://img.shields.io/badge/language-F%23-blueviolet)
+![WebSharper](https://img.shields.io/badge/WebSharper-UI-orange)
+![Status](https://img.shields.io/badge/status-active-success)
+![GitHub repo size](https://img.shields.io/github/repo-size/szrich83/PortfolioPilot)
+![GitHub last commit](https://img.shields.io/github/last-commit/szrich83/PortfolioPilot)
 
-## Overview
+![PortfolioPilot Preview](docs/portfolio-pilot-dashboard.png)
 
-The application helps users compare manually defined investment portfolios using a weighted multi-criteria decision model.  
-Instead of relying on live market APIs, it works with manually entered or predefined sample data, which makes it stable, predictable, and suitable for demonstration and educational use.
+---
 
-## Main Idea
+## Motivation
 
-Users can:
+Investment decisions are inherently multi-dimensional.
 
-- define or use sample financial assets
-- build portfolios from those assets
-- evaluate portfolios across multiple criteria
-- adjust decision weights interactively
-- view portfolio ranking in real time
-- read generated explanations about why a portfolio ranks higher or lower
+A portfolio with the highest expected return may also carry excessive risk, low liquidity, poor diversification, or high management fees.
+
+Most beginner investment tools simplify portfolio comparison into a single metric, which often produces misleading conclusions.
+
+The goal of PortfolioPilot is to model portfolio selection as a **multi-criteria decision support problem**, where multiple financial factors are weighted, normalized, and evaluated simultaneously.
+
+In addition to ranking portfolios, the system also performs long-term growth simulations to visualize how investment strategies may evolve over time.
+
+---
 
 ## Features
 
-- Manual-data portfolio analysis
-- Portfolio allocation validation
-- Portfolio-level metric calculation
-- Multi-criteria decision support
-- Benefit/cost normalization
-- Weighted portfolio scoring
-- Real-time ranking update
-- Explanation engine for decision transparency
-- Time-based portfolio growth chart
-- Interactive long-term simulation (capital, contribution, time horizon)
-- Manual asset management (create and remove financial assets)
-- Portfolio builder with custom asset allocations
-- Weighted decision support system (return, risk, fee, liquidity, diversification)
-- Strategy comparison and ranking
-- Long-term growth simulation (initial capital, monthly contribution, time horizon)
-- Visual comparison (score bars, growth chart, final value comparison)
-- Preset scenarios (risk-averse, balanced, growth-focused)
+### Core
 
-## How to use
+- Manual financial asset management
+- Portfolio creation with custom allocations
+- Multi-criteria portfolio ranking
+- Weighted decision scoring
+- Long-term growth simulation
+- JSON export functionality
 
-1. Adjust decision weights using sliders or preset buttons.
-2. Add custom financial assets in the Asset Editor.
-3. Create portfolios by assigning asset IDs and allocation percentages.
-4. Compare portfolio rankings based on your preferences.
-5. Simulate long-term growth using configurable parameters.
+### Advanced
 
-## Data model and assumptions
+- **Weighted decision engine**
+  - configurable importance values
+  - return vs risk balancing
+  - normalization-based scoring
 
-The application uses manually provided asset data instead of live market feeds.
+- **Portfolio simulation**
+  - monthly contribution support
+  - compound growth modeling
+  - long-term projection analysis
 
-Each asset includes:
+- **Dynamic visualization**
+  - portfolio comparison bars
+  - growth charts
+  - ranking panels
+  - simulation summaries
 
-- Expected annual return
-- Risk score
-- Annual fee
-- Liquidity score
-- Diversification score
+- **Browser persistence**
+  - save current data locally
+  - reload saved portfolios
+  - offline-compatible workflow
 
-Portfolio metrics are calculated using weighted averages of asset properties.
+---
 
-The simulation assumes constant annual returns and monthly compounding.
+## Decision Model
 
-## Limitations
+### Portfolio scoring
 
-- No live market data (simulation-based only)
-- Simplified risk model (no correlation or covariance)
-- Returns are deterministic (no stochastic modeling)
+Each portfolio is evaluated using multiple weighted criteria:
 
-## Future improvements
+| Criterion       | Type    |
+| --------------- | ------- |
+| Expected Return | Benefit |
+| Risk            | Cost    |
+| Annual Fee      | Cost    |
+| Liquidity       | Benefit |
+| Diversification | Benefit |
 
-- Asset selection via dropdown instead of manual ID input
-- Data import/export (CSV/JSON)
-- Persistent storage (local or database)
-- More advanced risk modeling
-- Interactive time-series charts
+The scoring engine normalizes all portfolio metrics before applying weighted calculations.
 
-## Current Decision Criteria
+---
 
-The current ranking model uses the following criteria:
+### Weighted ranking system
 
-- Expected return
-- Risk
-- Annual fee
-- Liquidity
-- Diversification
+The final portfolio score is determined by:
+
+- metric normalization
+- criterion weighting
+- weighted aggregation
+
+This allows users to prioritize:
+
+- aggressive growth
+- low risk
+- diversification
+- liquidity
+- fee minimization
+
+---
+
+### Growth simulation
+
+The system simulates long-term investment growth using:
+
+- initial capital
+- monthly contributions
+- expected annual return
+- compound growth
+
+This enables:
+
+- portfolio comparison over time
+- long-term strategy evaluation
+- future value estimation
+
+---
+
+## UI
+
+### Inputs
+
+- Asset parameters
+- Portfolio allocations
+- Decision weights
+- Initial capital
+- Monthly contribution
+- Investment duration
+
+---
+
+### Outputs
+
+- Portfolio rankings
+- Weighted scores
+- Growth charts
+- Final portfolio values
+- Portfolio explanations
+- JSON export file
+
+---
 
 ## Tech Stack
 
-- F#
-- WebSharper
-- ASP.NET Core
-- Vite
+- **F#**
+- **WebSharper UI**
+- Reactive UI (Var / View)
+- Functional domain modeling
+- Browser LocalStorage API
+
+---
+
+## Installation
+
+### Requirements
+
+- .NET 10 SDK
+- Node.js
+- npm
+
+### Clone the repository
+
+```bash
+git clone https://github.com/szrich83/PortfolioPilot.git
+cd PortfolioPilot
+```
+
+### Install dependencies
+
+```bash
+dotnet restore
+npm install
+```
+
+### Build
+
+```bash
+dotnet build -c Release
+```
+
+### Run the project
+
+```bash
+dotnet run
+```
+
+Then open the URL shown in the terminal.
+
+---
 
 ## Project Structure
 
 ```text
-src/
-  Domain.fs
-  Samples.fs
-  PortfolioMetrics.fs
-  Normalization.fs
-  Scoring.fs
-  Explanation.fs
-  Client.fs
-  Startup.fs
+PortfolioPilot/
+├── src/
+│   ├── Client.fs              # Main WebSharper SPA UI
+│   ├── Models.fs              # Domain models
+│   ├── Samples.fs             # Demo assets and portfolios
+│   ├── Scoring.fs             # Multi-criteria scoring engine
+│   ├── PortfolioMetrics.fs    # Portfolio metric calculations
+│   ├── Simulation.fs          # Investment growth simulation
+│   ├── Explanation.fs         # Ranking explanations
+├── wwwroot/
+│   ├── custom.css             # Styling and dashboard UI
+├── index.html                 # Entry point
 ```
+
+---
+
+## Screenshots
+
+### Main dashboard
+
+![Main UI](docs/main.png)
+
+### Portfolio ranking
+
+![Ranking](docs/ranking.png)
+
+### Growth simulation
+
+![Simulation](docs/simulation.png)
+
+---
+
+## Future Improvements
+
+- JSON import support
+- CSV import/export
+- Historical market data
+- Monte Carlo simulation
+- Portfolio optimization algorithms
+- Backend database support
+- User authentication
+- Real-time financial APIs
+
+---
+
+## Author
+
+Richárd Szőke  
+GNMH44  
+Software Engineering Student
+
+---
