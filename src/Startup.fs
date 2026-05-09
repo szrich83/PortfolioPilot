@@ -8,9 +8,10 @@ open PortfolioPilot
 
 [<EntryPoint>]
 let main args =
+
     let builder = WebApplication.CreateBuilder(args)
     
-    // Add services to the container.
+    // Register WebSharper services and cookie authentication
     builder.Services.AddWebSharper()
         .AddAuthentication("WebSharper")
         .AddCookie("WebSharper", fun options -> ())
@@ -18,23 +19,27 @@ let main args =
 
     let app = builder.Build()
 
-    // Configure the HTTP request pipeline.
+    // Enable production error handling and HSTS
     if not (app.Environment.IsDevelopment()) then
         app.UseExceptionHandler("/Error")
-            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
             .UseHsts()
         |> ignore
     
     app.UseHttpsRedirection()
+
 #if DEBUG        
+        // Redirect scripts to the Vite development server in DEBUG mode
         .UseWebSharperScriptRedirect(startVite = true)
 #endif
+
         .UseDefaultFiles()
         .UseStaticFiles()
-        //Enable if you want to make RPC calls to server
+
+        // Enable if server-side RPC calls are required
         //.UseWebSharperRemoting()
+
     |> ignore 
        
     app.Run()
 
-    0 // Exit code
+    0

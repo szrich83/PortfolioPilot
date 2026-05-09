@@ -5,6 +5,8 @@ open WebSharper
 [<JavaScript>]
 module Samples =
 
+    // Demo asset dataset used to make the application usable immediately
+    // without requiring live market APIs or external data sources.
     let sampleAssets : Asset list =
         [
             {
@@ -74,6 +76,8 @@ module Samples =
             }
         ]
 
+    // Predefined strategy examples used for comparison and demonstration.
+    // These portfolios represent different risk/return profiles.
     let samplePortfolios : Portfolio list =
         [
             {
@@ -109,6 +113,8 @@ module Samples =
             }
         ]
 
+    // Default criterion weights used as an initial decision-support scenario.
+    // Benefit criteria reward higher values, cost criteria reward lower values.
     let sampleCriteria : Criterion list =
         [
             { Id = "return"; Name = "Expected Return"; Kind = Benefit; Weight = 35.0 }

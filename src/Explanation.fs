@@ -5,19 +5,26 @@ open WebSharper
 [<JavaScript>]
 module Explanation =
 
+    // Select the strongest scoring criteria of a portfolio
     let private topPositiveCriteria (scores: CriterionScore list) =
         scores
         |> List.sortByDescending (fun s -> s.WeightedScore)
         |> List.truncate 2
 
+    // Select the weakest contributing criterion
     let private weakestCriteria (scores: CriterionScore list) =
         scores
         |> List.sortBy (fun s -> s.WeightedScore)
         |> List.truncate 1
 
+    // Generate a human-readable explanation for an individual portfolio ranking
     let buildPortfolioExplanation (portfolioScore: PortfolioScore) =
-        let strengths = topPositiveCriteria portfolioScore.CriteriaScores
-        let weaknesses = weakestCriteria portfolioScore.CriteriaScores
+
+        let strengths =
+            topPositiveCriteria portfolioScore.CriteriaScores
+
+        let weaknesses =
+            weakestCriteria portfolioScore.CriteriaScores
 
         let strengthsText =
             strengths
@@ -36,11 +43,15 @@ module Explanation =
             strengthsText
             weaknessesText
 
+    // Generate a summary recommendation for the top-ranked portfolio
     let buildWinnerExplanation (ranking: PortfolioScore list) =
         match ranking with
+
         | [] ->
             "No portfolio data is available."
+
         | winner :: _ ->
+
             let topTwo =
                 winner.CriteriaScores
                 |> List.sortByDescending (fun s -> s.WeightedScore)

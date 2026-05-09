@@ -23,6 +23,10 @@ The goal of PortfolioPilot is to model portfolio selection as a **multi-criteria
 
 In addition to ranking portfolios, the system also performs long-term growth simulations to visualize how investment strategies may evolve over time.
 
+The project also demonstrates how functional programming concepts can be applied to reactive financial modeling and decision-support systems.
+
+A reactive single-page portfolio analysis application built with F# and WebSharper.
+
 ---
 
 ## Features
@@ -35,6 +39,7 @@ In addition to ranking portfolios, the system also performs long-term growth sim
 - Weighted decision scoring
 - Long-term growth simulation
 - JSON export functionality
+- JSON import functionality
 
 ### Advanced
 
@@ -58,6 +63,7 @@ In addition to ranking portfolios, the system also performs long-term growth sim
   - save current data locally
   - reload saved portfolios
   - offline-compatible workflow
+  - LocalStorage-based persistence
 
 ---
 
@@ -142,9 +148,12 @@ This enables:
 
 - **F#**
 - **WebSharper UI**
+- ASP.NET Core
 - Reactive UI (Var / View)
 - Functional domain modeling
 - Browser LocalStorage API
+- Client-side JSON serialization
+- Functional multi-criteria scoring engine
 
 ---
 
@@ -192,15 +201,19 @@ Then open the URL shown in the terminal.
 PortfolioPilot/
 ├── src/
 │   ├── Client.fs              # Main WebSharper SPA UI
-│   ├── Models.fs              # Domain models
+│   ├── Domain.fs              # Domain models
+│   ├── Explanation.fs         # Ranking explanations
+│   ├── Normalization.fs       # Criteria normalization logic
+│   ├── PortfolioMetrics.fs    # Portfolio metric calculations
 │   ├── Samples.fs             # Demo assets and portfolios
 │   ├── Scoring.fs             # Multi-criteria scoring engine
-│   ├── PortfolioMetrics.fs    # Portfolio metric calculations
 │   ├── Simulation.fs          # Investment growth simulation
-│   ├── Explanation.fs         # Ranking explanations
+│   ├── Startup.fs             # Application startup configuration
 ├── wwwroot/
 │   ├── custom.css             # Styling and dashboard UI
 ├── index.html                 # Entry point
+├── PortfolioPilot.fsproj
+├── Dockerfile
 ```
 
 ---
@@ -238,7 +251,6 @@ PortfolioPilot/
 
 ## Future Improvements
 
-- JSON import support
 - CSV import/export
 - Historical market data
 - Monte Carlo simulation
@@ -250,6 +262,8 @@ PortfolioPilot/
 ---
 
 ## Live Demo
+
+> Note: The live demo may take a few seconds to start if the Render instance is inactive.
 
 https://portfoliopilot-yx7c.onrender.com/
 

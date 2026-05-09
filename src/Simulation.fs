@@ -5,13 +5,21 @@ open WebSharper
 [<JavaScript>]
 module Simulation =
 
+    // Convert annual percentage return into an approximate monthly growth rate
     let annualToMonthlyRate (annualReturnPercent: float) =
         annualReturnPercent / 100.0 / 12.0
 
-    let simulatePortfolioGrowth (initialCapital: float) (monthlyContribution: float) (years: int) (annualReturnPercent: float) =
+    // Simulate long-term portfolio growth using monthly compounding
+    let simulatePortfolioGrowth
+        (initialCapital: float)
+        (monthlyContribution: float)
+        (years: int)
+        (annualReturnPercent: float) =
+
         let months = max 0 (years * 12)
         let monthlyRate = annualToMonthlyRate annualReturnPercent
 
+        // Recursive simulation loop storing portfolio value for each month
         let rec loop month currentValue acc =
             if month > months then
                 List.rev acc
@@ -32,6 +40,7 @@ module Simulation =
 
         loop 0 initialCapital []
 
+    // Return the final portfolio value from the simulation timeline
     let getFinalValue (points: SimulationPoint list) =
         points
         |> List.tryLast

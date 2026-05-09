@@ -14,6 +14,10 @@ open WebSharper.JavaScript
 [<JavaScript>]
 module Client =
 
+    // -----------------------------
+    // Parsing and conversion helpers
+    // -----------------------------
+
     let private parseWeight (textValue: string) =
         match System.Double.TryParse(textValue) with
         | true, value when value >= 0.0 -> value
@@ -50,6 +54,12 @@ module Client =
         | Cash -> "Cash"
         | Crypto -> "Crypto"
 
+    // -----------------------------
+    // Browser integration helpers
+    // -----------------------------
+    // These inline JavaScript helpers are used for browser-only features
+    // that are not part of the pure F# domain model.
+
     [<Inline("(function(filename, content) { var blob = new Blob([content], { type: 'application/json' }); var url = URL.createObjectURL(blob); var a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); })($filename, $content)")>]
     let private downloadJsonFile (filename: string) (content: string) : unit =
         X<unit>
@@ -66,6 +76,92 @@ module Client =
     let private removeTextFromLocalStorage (key: string) : unit =
         X<unit>
 
+    // -----------------------------
+    // JSON import accessors
+    // -----------------------------
+    // WebSharper compiles this code to JavaScript, so these small inline
+    // helpers safely read fields from parsed JSON objects.
+
+    [<Inline("JSON.parse($json)")>]
+    let private parseJsonObject (json: string) : obj =
+        X<obj>
+
+    [<Inline("($data.assets || [])")>]
+    let private getJsonAssets (data: obj) : obj[] =
+        X<obj[]>
+
+    [<Inline("($data.portfolios || [])")>]
+    let private getJsonPortfolios (data: obj) : obj[] =
+        X<obj[]>
+
+    [<Inline("($asset.id || '')")>]
+    let private getAssetId (asset: obj) : string =
+        X<string>
+
+    [<Inline("($asset.name || '')")>]
+    let private getAssetName (asset: obj) : string =
+        X<string>
+
+    [<Inline("($asset.symbol || '')")>]
+    let private getAssetSymbol (asset: obj) : string =
+        X<string>
+
+    [<Inline("($asset.category || 'ETF')")>]
+    let private getAssetCategory (asset: obj) : string =
+        X<string>
+
+    [<Inline("Number($asset.currentPrice || 0)")>]
+    let private getAssetCurrentPrice (asset: obj) : float =
+        X<float>
+
+    [<Inline("Number($asset.expectedAnnualReturn || 0)")>]
+    let private getAssetExpectedReturn (asset: obj) : float =
+        X<float>
+
+    [<Inline("Number($asset.annualVolatility || 0)")>]
+    let private getAssetVolatility (asset: obj) : float =
+        X<float>
+
+    [<Inline("Number($asset.annualFee || 0)")>]
+    let private getAssetFee (asset: obj) : float =
+        X<float>
+
+    [<Inline("Number($asset.liquidityScore || 0)")>]
+    let private getAssetLiquidity (asset: obj) : float =
+        X<float>
+
+    [<Inline("Number($asset.diversificationScore || 0)")>]
+    let private getAssetDiversification (asset: obj) : float =
+        X<float>
+
+    [<Inline("Number($asset.riskScore || 0)")>]
+    let private getAssetRisk (asset: obj) : float =
+        X<float>
+
+    [<Inline("($portfolio.id || '')")>]
+    let private getPortfolioId (portfolio: obj) : string =
+        X<string>
+
+    [<Inline("($portfolio.name || '')")>]
+    let private getPortfolioName (portfolio: obj) : string =
+        X<string>
+
+    [<Inline("($portfolio.allocations || [])")>]
+    let private getPortfolioAllocations (portfolio: obj) : obj[] =
+        X<obj[]>
+
+    [<Inline("($allocation.assetId || '')")>]
+    let private getAllocationAssetId (allocation: obj) : string =
+        X<string>
+
+    [<Inline("Number($allocation.percentage || 0)")>]
+    let private getAllocationPercentage (allocation: obj) : float =
+        X<float>
+
+    // -----------------------------
+    // Decision and validation helpers
+    // -----------------------------
+
     let private optionValueOrEmpty (value: string) =
         if value.Trim() = "" then None else Some value
 
@@ -80,6 +176,11 @@ module Client =
             { Id = "liquidity"; Name = "Liquidity"; Kind = Benefit; Weight = l }
             { Id = "diversification"; Name = "Diversification"; Kind = Benefit; Weight = d }
         ]
+
+    // -----------------------------
+    // Reusable UI fragments
+    // -----------------------------
+    // Small view helpers keep the main page layout shorter and easier to read.
 
     let private metricRow (title: string) (value: float) (suffix: string) =
         p [ attr.``class`` "metric-row" ] [
@@ -197,6 +298,9 @@ module Client =
             ]
         ]
 
+    // Render a simple custom growth chart from simulation points.
+    // The chart uses positioned HTML elements instead of an external chart library.
+
     let private growthChart (results: (string * float * float * SimulationPoint list) list) =
         let maxMonth =
             results
@@ -258,6 +362,10 @@ module Client =
             ]
         ]
 
+    // -----------------------------
+    // Form input helpers
+    // -----------------------------
+
     let private weightInput (labelText: string) (state: Var<string>) =
         div [ attr.``class`` "weight-field" ] [
             label [ attr.``class`` "weight-label" ] [ text labelText ]
@@ -290,6 +398,9 @@ module Client =
             ] state
         ]
 
+    // Asset selection helper for portfolio allocation inputs.
+    // The visible buttons fill the underlying AssetId field.
+
     let private assetSelectorField (labelText: string) (state: Var<string>) (assetsView: View<Asset list>) =
         div [ attr.``class`` "weight-field" ] [
             label [ attr.``class`` "weight-label" ] [ text labelText ]
@@ -316,6 +427,10 @@ module Client =
                 )
                 assetsView
         ]
+
+    // -----------------------------
+    // JSON export helpers
+    // -----------------------------
 
     let private escapeJson (value: string) =
         value
@@ -353,7 +468,7 @@ module Client =
 
     let private allocationToJson (allocation: PortfolioAllocation) =
         sprintf
-            """{
+            """    {
       "assetId": "%s",
       "percentage": %.2f
     }"""
@@ -401,6 +516,10 @@ module Client =
             assetsJson
             portfoliosJson
 
+    // -----------------------------
+    // Table row helpers
+    // -----------------------------
+
     let private assetRow (removeAsset: string -> unit) (asset: Asset) =
         tr [] [
             td [] [ text asset.Id ]
@@ -419,6 +538,63 @@ module Client =
                 ]
             ]
         ]
+
+    // -----------------------------
+    // JSON import mapping helpers
+    // -----------------------------
+    // Convert parsed JavaScript objects back into strongly typed F# domain records.
+
+    let private jsonAssetToAsset (asset: obj) : Asset =
+        {
+            Id = getAssetId asset
+            Name = getAssetName asset
+            Symbol = getAssetSymbol asset
+            Category = categoryFromString (getAssetCategory asset)
+            CurrentPrice = getAssetCurrentPrice asset
+            ExpectedAnnualReturn = getAssetExpectedReturn asset
+            AnnualVolatility = getAssetVolatility asset
+            AnnualFee = getAssetFee asset
+            LiquidityScore = getAssetLiquidity asset
+            DiversificationScore = getAssetDiversification asset
+            RiskScore = getAssetRisk asset
+        }
+
+    let private jsonAllocationToAllocation (allocation: obj) : PortfolioAllocation =
+        {
+            AssetId = getAllocationAssetId allocation
+            Percentage = getAllocationPercentage allocation
+        }
+
+    let private jsonPortfolioToPortfolio (portfolio: obj) : Portfolio =
+        {
+            Id = getPortfolioId portfolio
+            Name = getPortfolioName portfolio
+            Allocations =
+                getPortfolioAllocations portfolio
+                |> Array.toList
+                |> List.map jsonAllocationToAllocation
+                |> List.filter (fun a -> a.AssetId.Trim() <> "" && a.Percentage > 0.0)
+        }
+
+    let private tryImportDataFromJson (json: string) =
+        try
+            let data = parseJsonObject json
+
+            let assets =
+                getJsonAssets data
+                |> Array.toList
+                |> List.map jsonAssetToAsset
+                |> List.filter (fun a -> a.Id.Trim() <> "" && a.Name.Trim() <> "")
+
+            let portfolios =
+                getJsonPortfolios data
+                |> Array.toList
+                |> List.map jsonPortfolioToPortfolio
+                |> List.filter (fun p -> p.Id.Trim() <> "" && p.Name.Trim() <> "")
+
+            Some (assets, portfolios)
+        with _ ->
+            None
 
     let private portfolioRow (removePortfolio: string -> unit) (portfolio: Portfolio) =
         tr [] [
@@ -471,6 +647,13 @@ module Client =
 
     [<SPAEntryPoint>]
     let Main () =
+
+        // -----------------------------
+        // Main reactive application state
+        // -----------------------------
+        // Var values represent mutable client-side state.
+        // Views derived from these Vars update the UI automatically.
+
         let returnWeightText = Var.Create "35"
         let riskWeightText = Var.Create "25"
         let feeWeightText = Var.Create "15"
@@ -483,7 +666,7 @@ module Client =
 
         let assetsState = Var.Create sampleAssets
         let portfoliosState = Var.Create samplePortfolios
-
+        // Asset editor state
         let assetNameText = Var.Create ""
         let assetSymbolText = Var.Create ""
         let assetCategoryText = Var.Create "ETF"
@@ -494,7 +677,7 @@ module Client =
         let assetLiquidityText = Var.Create "0"
         let assetDiversificationText = Var.Create "0"
         let assetRiskText = Var.Create "0"
-
+        // Portfolio editor state
         let portfolioNameText = Var.Create ""
         let allocationAsset1Text = Var.Create ""
         let allocationPercent1Text = Var.Create "0"
@@ -502,10 +685,11 @@ module Client =
         let allocationPercent2Text = Var.Create "0"
         let allocationAsset3Text = Var.Create ""
         let allocationPercent3Text = Var.Create "0"
-
+        // JSON export/import and browser storage state
         let exportedJsonText = Var.Create ""
         let storageStatusText = Var.Create ""
 
+        // Derived view used to validate whether portfolio allocations add up to 100%
         let allocationTotalView : View<float> =
             View.Map2
                 (fun left p3 ->
@@ -517,6 +701,10 @@ module Client =
                     allocationPercent1Text.View
                     allocationPercent2Text.View)
                 allocationPercent3Text.View
+
+        // -----------------------------
+        // Form reset helpers
+        // -----------------------------
 
         let clearAssetForm () =
             assetNameText.Set ""
@@ -538,6 +726,10 @@ module Client =
             allocationPercent2Text.Set "0"
             allocationAsset3Text.Set ""
             allocationPercent3Text.Set "0"
+
+        // -----------------------------
+        // Asset and portfolio mutation logic
+        // -----------------------------
 
         let addAsset () =
             let newAsset : Asset =
@@ -564,6 +756,7 @@ module Client =
                 assetsState.Value
                 |> List.filter (fun a -> a.Id <> assetId)
 
+            // Removing an asset also removes invalid allocations that reference it
             let updatedPortfolios =
                 portfoliosState.Value
                 |> List.map (fun p ->
@@ -635,6 +828,10 @@ module Client =
                 |> List.filter (fun p -> p.Id <> portfolioId)
             )
 
+        // -----------------------------
+        // JSON export/import and browser storage actions
+        // -----------------------------
+
         let exportCurrentData () =
             let json =
                 exportDataToJson assetsState.Value portfoliosState.Value
@@ -662,6 +859,28 @@ module Client =
         let clearSavedDataFromBrowser () =
             removeTextFromLocalStorage "portfolioPilotData"
             storageStatusText.Set "Saved browser data cleared."
+
+        let importJsonFromBox () =
+            match tryImportDataFromJson exportedJsonText.Value with
+            | Some (assets, portfolios) when not assets.IsEmpty ->
+                assetsState.Set assets
+                portfoliosState.Set portfolios
+                storageStatusText.Set (
+                    sprintf "Imported %d assets and %d portfolios from JSON."
+                        (List.length assets)
+                        (List.length portfolios)
+                )
+
+            | Some _ ->
+                storageStatusText.Set "JSON is valid, but it does not contain valid assets."
+
+            | None ->
+                storageStatusText.Set "Invalid JSON. Import failed."
+
+        // -----------------------------
+        // Reactive derived views
+        // -----------------------------
+        // These views recalculate automatically whenever the underlying Vars change.
 
         let weightsView : View<float * float * float * float * float> =
             View.Map2
@@ -726,6 +945,10 @@ module Client =
                 portfolioMetricsView
                 simulationInputsView
 
+        // -----------------------------
+        // Page layout
+        // -----------------------------
+
         let content =
             div [ attr.``class`` "page" ] [
                 h1 [] [ text "PortfolioPilot" ]
@@ -772,6 +995,7 @@ module Client =
                     ]
                 ]
 
+                // Recommended result based on the current weighted ranking
                 h2 [] [ text "Recommended result" ]
 
                 div [ attr.``class`` "summary-box" ] [
@@ -784,6 +1008,7 @@ module Client =
                         rankingView
                 ]
 
+                // Manual asset creation section
                 h2 [] [ text "Asset editor" ]
 
                 div [ attr.``class`` "summary-box weights-panel" ] [
@@ -814,6 +1039,7 @@ module Client =
                     ]
                 ]
 
+                // Current asset table
                 h2 [] [ text "Available assets" ]
 
                 div [ attr.``class`` "summary-box" ] [
@@ -841,6 +1067,7 @@ module Client =
                         assetsState.View
                 ]
 
+                // Portfolio creation section with allocation validation
                 h2 [] [ text "Portfolio editor" ]
 
                 div [ attr.``class`` "summary-box weights-panel" ] [
@@ -906,6 +1133,7 @@ module Client =
                     ]
                 ]
 
+                // Portfolio table with delete support
                 h2 [] [ text "Available portfolios" ]
 
                 div [ attr.``class`` "summary-box" ] [
@@ -930,6 +1158,7 @@ module Client =
                         portfoliosState.View
                 ]
 
+                // Detailed portfolio cards
                 h2 [] [ text "Current portfolios" ]
 
                 Doc.BindView
@@ -945,6 +1174,7 @@ module Client =
                     )
                     assetsState.View
 
+                // Visual comparison of weighted scores
                 h2 [] [ text "Score comparison" ]
 
                 div [ attr.``class`` "summary-box" ] [
@@ -958,6 +1188,7 @@ module Client =
                         rankingView
                 ]
 
+                // Ranked portfolio cards with score explanations
                 h2 [] [ text "Portfolio ranking" ]
 
                 Doc.BindView
@@ -969,6 +1200,7 @@ module Client =
                     )
                     rankingView
 
+                // Simulation input controls
                 h2 [] [ text "Growth simulation" ]
 
                 div [ attr.``class`` "summary-box weights-panel" ] [
@@ -983,6 +1215,7 @@ module Client =
                     ]
                 ]
 
+                // Time-based growth visualization
                 h2 [] [ text "Growth chart" ]
 
                 div [ attr.``class`` "summary-box" ] [
@@ -991,6 +1224,7 @@ module Client =
                         simulationView
                 ]
 
+                // Final simulated value comparison
                 h2 [] [ text "Final value comparison" ]
 
                 div [ attr.``class`` "summary-box" ] [
@@ -1009,6 +1243,7 @@ module Client =
                         simulationView
                 ]
 
+                // Numeric simulation result cards
                 h2 [] [ text "Simulation results" ]
 
                 Doc.BindView
@@ -1024,6 +1259,7 @@ module Client =
                     )
                     simulationView
 
+                // JSON export, import and browser persistence controls
                 h2 [] [ text "Data export" ]
 
                 div [ attr.``class`` "summary-box weights-panel" ] [
@@ -1055,6 +1291,13 @@ module Client =
                             on.click (fun _ _ -> loadSavedDataFromBrowser ())
                         ] [
                             text "Load saved JSON"
+                        ]
+
+                        button [
+                            attr.``class`` "preset-button"
+                            on.click (fun _ _ -> importJsonFromBox ())
+                        ] [
+                            text "Import JSON from text"
                         ]
 
                         button [
